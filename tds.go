@@ -2,8 +2,10 @@ package mssql
 
 import (
 	"context"
+	"crypto/sha256"
 	"crypto/tls"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -19,6 +21,14 @@ import (
 	"github.com/microsoft/go-mssqldb/integratedauth"
 	"github.com/microsoft/go-mssqldb/msdsn"
 )
+
+func createKey(p *msdsn.Config) string {
+	combinedString := fmt.Sprintf("%s:%d:%s:%s", p.Host, p.Port, p.User, p.Password)
+	hash := sha256.New()
+	hash.Write([]byte(combinedString))
+
+	return hex.EncodeToString(hash.Sum(nil))
+}
 
 func parseDAC(msg []byte, instance string) msdsn.BrowserData {
 	results := msdsn.BrowserData{}
@@ -986,6 +996,9 @@ func dialConnection(ctx context.Context, c *Connector, p *msdsn.Config, logger C
 			if logger != nil && uint64(p.LogFlags)&logDebug != 0 {
 				logger.Log(ctx, msdsn.LogDebug, "Returning connection from protocol "+protocol)
 			}
+			key := createKey(p)
+			Connmap[key] = conn
+
 			return
 		}
 	}
